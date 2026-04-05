@@ -36,12 +36,8 @@ EE5311_Group22/
 
 ## Viewing the Blog
 
-Open `index.html` in any modern browser. No server needed — it is a static HTML page.
-
-If deploying to GitHub Pages, push this repository and enable Pages from the `master` branch. The blog will be available at:
-
 ```
-https://<username>.github.io/EE5311_Group22/
+https://yinbo0927.github.io/EE5311_Group22/
 ```
 
 ## Running the Code
