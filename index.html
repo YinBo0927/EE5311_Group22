@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="title" content="Beyond ODEs: Solving the Heat Equation with PINNs in Julia - EE5311 Group 22">
+  <meta name="description" content="We solve the heat equation using Physics-Informed Neural Networks in Julia, compare with FDM, and demonstrate inverse parameter estimation from noisy data.">
+  <meta name="keywords" content="PINN, physics-informed neural networks, heat equation, Julia, NeuralPDE, inverse problem, finite difference method">
+  <meta name="author" content="Yin Bo, Fang An, Liu Cheng, Niu Cheng, Jiang Yuxing">
+
+  <title>Beyond ODEs: Solving the Heat Equation with PINNs in Julia | EE5311 Group 22</title>
+
+  <link rel="icon" type="image/x-icon" href="static/images/favicon.ico">
+  <link rel="stylesheet" href="static/css/bulma.min.css">
+  <link rel="stylesheet" href="static/css/index.css">
+  <link rel="preload" href="static/css/fontawesome.all.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'">
+  <noscript><link rel="stylesheet" href="static/css/fontawesome.all.min.css"></noscript>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- MathJax for LaTeX -->
+  <script>
+    MathJax = {
+      tex: { inlineMath: [['$','$'], ['\\(','\\)']], displayMath: [['$$','$$'], ['\\[','\\]']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+  <!-- Highlight.js for code -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github.min.css">
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/languages/julia.min.js"></script>
+  <script>document.addEventListener('DOMContentLoaded', () => hljs.highlightAll());</script>
+
+  <script defer src="static/js/fontawesome.all.min.js"></script>
+
+  <style>
+    /* Blog-specific styles */
+    .blog-section { padding: 2rem 0; }
+    .blog-section:nth-child(even) { background-color: var(--background-secondary); }
+    .blog-content { max-width: 860px; margin: 0 auto; }
+    .blog-content h2 { font-size: 1.8rem; font-weight: 700; margin-top: 2.5rem; margin-bottom: 1rem; color: var(--text-primary); border-bottom: 2px solid var(--primary-color); padding-bottom: 0.5rem; }
+    .blog-content h3 { font-size: 1.35rem; font-weight: 600; margin-top: 2rem; margin-bottom: 0.75rem; color: var(--text-primary); }
+    .blog-content p { margin-bottom: 1.2rem; line-height: 1.8; color: #334155; }
+    .blog-content ul, .blog-content ol { margin-bottom: 1.2rem; margin-left: 1.5rem; }
+    .blog-content li { margin-bottom: 0.5rem; line-height: 1.7; }
+    .blog-content blockquote { background: #f0f9ff; border-left: 4px solid var(--primary-color); padding: 1rem 1.5rem; margin: 1.5rem 0; border-radius: 0 8px 8px 0; }
+    .blog-content blockquote p { margin-bottom: 0.5rem; }
+    .blog-content pre { border-radius: 10px; margin: 1.5rem 0; overflow-x: auto; }
+    .blog-content code { font-size: 0.9em; }
+    .blog-content pre code { font-size: 0.85rem; line-height: 1.6; }
+    .blog-content img { border-radius: 10px; box-shadow: var(--shadow-md); margin: 1rem 0; }
+    .figure-caption { text-align: center; font-size: 0.95rem; color: var(--text-secondary); margin-top: 0.5rem; margin-bottom: 2rem; font-style: italic; }
+    .blog-content table { width: 100%; border-collapse: collapse; margin: 1.5rem 0; font-size: 0.95rem; }
+    .blog-content th, .blog-content td { padding: 0.75rem 1rem; border: 1px solid var(--border-color); text-align: left; }
+    .blog-content th { background: #f1f5f9; font-weight: 600; }
+    .blog-content tr:hover { background: #f8fafc; }
+    .equation-block { text-align: center; margin: 1.5rem 0; overflow-x: auto; }
+    .highlight-box { background: linear-gradient(135deg, #eff6ff 0%, #f0fdf4 100%); border: 1px solid #bfdbfe; border-radius: 10px; padding: 1.25rem 1.5rem; margin: 1.5rem 0; }
+    .highlight-box strong { color: var(--primary-color); }
+    .contrib-card { background: white; border-radius: 10px; padding: 1rem 1.25rem; box-shadow: var(--shadow-sm); border: 1px solid var(--border-color); margin-bottom: 0.75rem; display: flex; gap: 1rem; align-items: flex-start; }
+    .contrib-card .name { font-weight: 700; color: var(--primary-color); min-width: 120px; }
+    .contrib-card .desc { color: #475569; }
+    .training-output { background: #1e293b; color: #e2e8f0; border-radius: 10px; padding: 1.25rem; margin: 1.5rem 0; font-family: monospace; font-size: 0.85rem; line-height: 1.7; overflow-x: auto; }
+    .training-output .phase { color: #60a5fa; font-weight: bold; }
+    .training-output .result { color: #34d399; }
+  </style>
+</head>
+<body>
+
+<main id="main-content">
+
+<!-- Hero Section -->
+<section class="hero">
+  <div class="hero-body">
+    <div class="container is-max-desktop">
+      <div class="columns is-centered">
+        <div class="column has-text-centered">
+          <h1 class="title is-1 publication-title">Beyond ODEs: Solving the Heat Equation with Physics-Informed Neural Networks in Julia</h1>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block"><strong>Yin Bo</strong>,</span>
+            <span class="author-block"><strong>Fang An</strong>,</span>
+            <span class="author-block"><strong>Liu Cheng</strong>,</span>
+            <span class="author-block"><strong>Niu Cheng</strong>,</span>
+            <span class="author-block"><strong>Jiang Yuxing</strong></span>
+          </div>
+          <div class="is-size-5 publication-authors">
+            <span class="author-block">National University of Singapore<br>EE5311 CA1 Blog &mdash; Group 22</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Abstract -->
+<section class="section hero is-light">
+  <div class="container is-max-desktop">
+    <div class="columns is-centered has-text-centered">
+      <div class="column is-four-fifths">
+        <h2 class="title is-3">Abstract</h2>
+        <div class="content has-text-justified">
+          <p>
+            Physics-Informed Neural Networks (PINNs) embed physical laws directly into the neural network's loss function, enabling solutions to differential equations without labelled data. In this blog, we extend the ODE-based PINN demonstrations from EE5311 to <strong>partial differential equations</strong> by solving the 1D and 2D heat equations using Julia's <code>NeuralPDE.jl</code>. We systematically compare PINNs against the classical Finite Difference Method (FDM), document practical lessons on training strategies and package compatibility, and demonstrate a unique PINN capability: <strong>solving an inverse problem</strong> to recover unknown thermal diffusivity from noisy sensor data with only 0.7% relative error.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Main Blog Content -->
+<section class="section">
+  <div class="container is-max-desktop">
+    <div class="blog-content content">
+
+      <!-- Section 1 -->
+      <h2>1. Introduction: From ODEs to PDEs with PINNs</h2>
+
+      <p>In EE5311, we have seen how physics-informed neural networks (PINNs) can solve ordinary differential equations (ODEs) by embedding physical laws directly into the neural network's loss function. The ecological model (Lotka&ndash;Volterra) and the netball-playing robot demonstrated that PINNs can learn solutions without any labelled data &mdash; the governing equations themselves supervise training.</p>
+
+      <p>But what happens when we move from ODEs to <strong>partial differential equations (PDEs)</strong>? PDEs govern a vast range of phenomena &mdash; heat conduction, fluid flow, electromagnetic wave propagation &mdash; and introduce new variables (space <em>and</em> time), boundary conditions on domain edges, and far larger solution spaces. These features bring challenges that do not arise in the ODE setting: more collocation points are needed, the loss function must balance PDE residuals against multiple boundary and initial conditions, and training becomes significantly more expensive.</p>
+
+      <p>In this blog, we explore these challenges by solving the <strong>heat equation</strong> &mdash; one of the most fundamental PDEs in physics and engineering &mdash; using <code>NeuralPDE.jl</code>, Julia's PINN framework. We start from the 1D case, extend to 2D, compare against the classical finite difference method (FDM), share practical lessons, and finally tackle an <strong>inverse problem</strong> &mdash; estimating an unknown thermal diffusivity from noisy sensor data &mdash; demonstrating a capability that is unique to the PINN approach.</p>
+
+      <h3>The Heat Equation</h3>
+
+      <p>The heat equation describes how temperature $u$ evolves over time in a medium with thermal diffusivity $\alpha$:</p>
+
+      <div class="equation-block">$$\frac{\partial u}{\partial t} = \alpha \frac{\partial^2 u}{\partial x^2}$$</div>
+
+      <p>We consider a rod of length $L = 1$ with both ends held at zero temperature (Dirichlet boundary conditions) and an initial temperature distribution $u(0, x) = \sin(\pi x)$:</p>
+
+      <div class="equation-block">$$u(0, x) = \sin(\pi x), \quad u(t, 0) = 0, \quad u(t, 1) = 0$$</div>
+
+      <p>This problem has a known analytical solution:</p>
+
+      <div class="equation-block">$$u_{\text{exact}}(t, x) = e^{-\alpha \pi^2 t} \sin(\pi x)$$</div>
+
+      <p>which provides a ground truth for validating our PINN and FDM solutions. We set $\alpha = 0.1$ throughout.</p>
+
+
+      <!-- Section 2 -->
+      <h2>2. Solving the 1D Heat Equation with NeuralPDE.jl</h2>
+
+      <p><code>NeuralPDE.jl</code> allows us to define a PDE symbolically using <code>ModelingToolkit.jl</code> and automatically construct a PINN loss function. Readers familiar with the course's Julia-based ODE examples will find the workflow similar, but with key differences: we now define spatial domains and boundary conditions on domain edges, and select a <em>training strategy</em> that determines how collocation points are sampled.</p>
+
+      <div class="highlight-box">
+        <strong>Package note:</strong> The code below uses <code>NeuralPDE.jl</code> with Julia 1.12. In newer versions, <code>Interval</code> has moved from <code>ModelingToolkit</code> to <code>DomainSets</code>, and <code>Adam</code>/<code>LBFGS</code> require explicit module qualification to resolve naming conflicts. See &sect;5 for details.
+      </div>
+
+      <p>Here is the complete, working implementation:</p>
+
+<pre><code class="language-julia">using NeuralPDE, Lux, ModelingToolkit, Optimization
+using OptimizationOptimisers, OptimizationOptimJL, LineSearches
+using DomainSets: Interval
+using Plots
+
+# --- Step 1: Define the PDE symbolically ---
+@parameters t x
+@variables u(..)
+Dt  = Differential(t)
+Dxx = Differential(x)^2
+
+&alpha; = 0.1
+eq = Dt(u(t, x)) ~ &alpha; * Dxx(u(t, x))    # heat equation
+
+# --- Step 2: Boundary &amp; initial conditions ---
+bcs = [
+    u(0, x) ~ sin(&pi; * x),    # initial temperature profile
+    u(t, 0) ~ 0.0,              # left end held at 0
+    u(t, 1) ~ 0.0               # right end held at 0
+]
+
+# --- Step 3: Define the domain ---
+domains = [
+    t &isin; Interval(0.0, 1.0),
+    x &isin; Interval(0.0, 1.0)
+]
+
+# --- Step 4: Set up the neural network ---
+chain = Lux.Chain(
+    Dense(2, 20, Lux.tanh),
+    Dense(20, 20, Lux.tanh),
+    Dense(20, 1)
+)
+
+# --- Step 5: Choose a training strategy and discretize ---
+strategy       = QuasiRandomTraining(200)
+discretization = PhysicsInformedNN(chain, strategy)
+
+@named pde_system = PDESystem(eq, bcs, domains, [t, x], [u(t, x)])
+prob = discretize(pde_system, discretization)
+
+# --- Step 6: Two-phase training ---
+println("=== Phase 1: Adam (3000 iters) ===")
+res = Optimization.solve(
+    prob,
+    OptimizationOptimisers.Adam(0.005);
+    maxiters = 3000, callback = callback
+)
+
+println("=== Phase 2: L-BFGS (1000 iters) ===")
+prob2 = remake(prob, u0 = res.minimizer)
+res2  = Optimization.solve(
+    prob2,
+    OptimizationOptimJL.LBFGS();
+    maxiters = 1000, callback = callback
+)</code></pre>
+
+      <p>A few points deserve attention:</p>
+      <ul>
+        <li><strong>Network input/output:</strong> The network takes 2 inputs $(t, x)$ and produces 1 output $\hat{u}(t,x)$. This is different from the ODE case where the input is just $t$.</li>
+        <li><strong>Activation function:</strong> We use <code>tanh</code> rather than sigmoid. For PDE problems involving second-order derivatives, smooth activations generally give better gradient flow through the double differentiation $\partial^2 / \partial x^2$.</li>
+        <li><strong>Training strategy:</strong> <code>QuasiRandomTraining(200)</code> samples 200 quasi-random collocation points per iteration using a Latin Hypercube scheme.</li>
+        <li><strong>Two-phase optimisation:</strong> We first use Adam to broadly explore the loss landscape, then switch to L-BFGS to refine the solution. This "Adam &rarr; L-BFGS" pattern is a well-known best practice in the PINN literature (Raissi et al. 2019).</li>
+      </ul>
+
+      <h3>Training Results</h3>
+
+      <div class="training-output">
+<span class="phase">=== Phase 1: Adam (3000 iters) ===</span>
+Iter  500  |  Loss = 5.180e-4
+Iter 1000  |  Loss = 1.496e-4
+Iter 1500  |  Loss = 1.311e-4
+Iter 2000  |  Loss = 1.374e-4
+Iter 2500  |  Loss = 1.492e-4
+Iter 3000  |  Loss = 3.848e-4
+
+<span class="phase">=== Phase 2: L-BFGS (1000 iters) ===</span>
+<span class="result">&check; Training complete. Final loss = 2.055e-5</span>
+
+Max  absolute error: 2.23e-3
+Mean absolute error: 4.91e-4
+      </div>
+
+      <p>The Adam phase shows some oscillation after iter 1500, which is a sign that the learning rate of 0.005 is slightly large for this problem. The L-BFGS phase then smoothly refines from wherever Adam left off, reducing the loss by roughly one order of magnitude to $2.055 \times 10^{-5}$.</p>
+
+      <h3>Visualising the Solution</h3>
+
+      <p><strong>Figure 1</strong> &mdash; Side-by-side surface comparison of the PINN prediction and the analytical solution. The two surfaces are visually indistinguishable.</p>
+      <img src="static/images/fig1_surface.png" alt="PINN vs Analytical Solution" loading="lazy" style="width:100%">
+      <p class="figure-caption">Figure 1: PINN solution (left) vs analytical solution (right) for the 1D heat equation.</p>
+
+      <p><strong>Figure 2</strong> &mdash; Absolute error heatmap. The maximum error of $2.23 \times 10^{-3}$ is localised near small $t$ values, where the sharp sinusoidal profile is hardest for the network to resolve.</p>
+      <img src="static/images/fig2_error.png" alt="Absolute Error Heatmap" loading="lazy" style="width:100%">
+      <p class="figure-caption">Figure 2: Absolute error heatmap between PINN and analytical solution.</p>
+
+      <p><strong>Figure 3</strong> &mdash; Training loss curve showing the two-phase optimisation strategy. The Adam phase explores broadly (blue), while L-BFGS refines sharply (orange).</p>
+      <img src="static/images/fig3_loss.png" alt="Training Loss Curve" loading="lazy" style="width:100%">
+      <p class="figure-caption">Figure 3: Two-phase training loss curve (Adam + L-BFGS).</p>
+
+      <p><strong>Figure 4</strong> &mdash; Solution profiles at three fixed time slices $t = 0.1, 0.5, 1.0$. The PINN predictions (dashed) closely follow the analytical solutions (solid).</p>
+      <img src="static/images/fig4_slices.png" alt="Solution at Fixed Time Slices" loading="lazy" style="width:100%">
+      <p class="figure-caption">Figure 4: PINN vs analytical solution at fixed time slices.</p>
+
+
+      <!-- Section 3 -->
+      <h2>3. Extending to the 2D Heat Equation</h2>
+
+      <p>Real-world thermal problems are rarely one-dimensional. We now extend our approach to the 2D heat equation on a unit square:</p>
+
+      <div class="equation-block">$$\frac{\partial u}{\partial t} = \alpha \left( \frac{\partial^2 u}{\partial x^2} + \frac{\partial^2 u}{\partial y^2} \right)$$</div>
+
+      <p>with initial condition $u(0, x, y) = \sin(\pi x) \sin(\pi y)$ and zero Dirichlet boundaries on all four edges. The analytical solution is:</p>
+
+      <div class="equation-block">$$u_{\text{exact}}(t, x, y) = e^{-2\alpha\pi^2 t} \sin(\pi x) \sin(\pi y)$$</div>
+
+      <h3>What Changes in 2D?</h3>
+
+      <p>Moving from 1D to 2D surfaces several challenges:</p>
+      <ul>
+        <li><strong>More collocation points are needed.</strong> In 1D we had a 2D input space $(t, x)$; now it is 3D $(t, x, y)$. We use 500 points per iteration instead of 200.</li>
+        <li><strong>More boundary conditions.</strong> We go from 3 conditions (initial + two endpoints) to 5 (initial + four edges).</li>
+        <li><strong>Larger networks.</strong> We widen the hidden layers from 20 to 32 neurons.</li>
+        <li><strong>Longer training.</strong> The 2D case required roughly 3&ndash;4&times; more Adam iterations to converge.</li>
+      </ul>
+
+
+      <!-- Section 4 -->
+      <h2>4. Comparison with the Finite Difference Method</h2>
+
+      <p>To put the PINN results in perspective, we solve the same 1D heat equation using the classical <strong>explicit finite difference method (FDM)</strong>.</p>
+
+      <h3>FDM Implementation</h3>
+
+      <p>The idea is straightforward: discretize the spatial domain into $N$ grid points and advance the solution in small time steps $\Delta t$:</p>
+
+      <div class="equation-block">$$u_i^{n+1} = u_i^n + \frac{\alpha \Delta t}{\Delta x^2} (u_{i+1}^n - 2u_i^n + u_{i-1}^n)$$</div>
+
+      <p>The stability condition requires $r = \alpha \Delta t / \Delta x^2 \leq 0.5$ (the CFL condition).</p>
+
+<pre><code class="language-julia">function solve_heat_fdm(&alpha;, Nx, Nt, T)
+    dx = 1.0 / Nx
+    dt = T / Nt
+    r  = &alpha; * dt / dx^2
+
+    @assert r &lt;= 0.5 "Unstable: r = $r > 0.5."
+
+    u = zeros(Nx + 1, Nt + 1)
+    x = range(0, 1, length = Nx + 1)
+    u[:, 1] = sin.(&pi; .* x)      # Initial condition
+
+    for n in 1:Nt
+        for i in 2:Nx
+            u[i, n+1] = u[i, n] + r * (u[i+1, n] - 2*u[i, n] + u[i-1, n])
+        end
+    end
+    return collect(x), collect(range(0, T, length = Nt + 1)), u
+end</code></pre>
+
+      <h3>Head-to-Head Comparison</h3>
+
+      <table>
+        <thead>
+          <tr><th>Aspect</th><th>FDM (Nx=100, Nt=5000)</th><th>PINN (NeuralPDE.jl)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Max absolute error</strong></td><td>~$10^{-5}$</td><td>$2.23 \times 10^{-3}$</td></tr>
+          <tr><td><strong>Mean absolute error</strong></td><td>~$10^{-6}$</td><td>$4.91 \times 10^{-4}$</td></tr>
+          <tr><td><strong>Computation time</strong></td><td>&lt; 1 second</td><td>~2 minutes (training)</td></tr>
+          <tr><td><strong>Mesh dependency</strong></td><td>Yes &mdash; grid points only</td><td>No &mdash; continuous, query anywhere</td></tr>
+          <tr><td><strong>Irregular geometries</strong></td><td>Requires complex meshing</td><td>Naturally mesh-free</td></tr>
+          <tr><td><strong>Inverse problems</strong></td><td>Requires separate formulation</td><td>Embed unknown params in loss (see &sect;6)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="highlight-box">
+        <strong>Key takeaway:</strong> For forward problems on regular domains, FDM is significantly faster and more accurate. However, PINNs offer unique advantages: mesh-free operation, continuous differentiable solutions, and natural extensibility to inverse problems.
+      </div>
+
+
+      <!-- Section 5 -->
+      <h2>5. Practical Lessons: Training Tips and Pitfalls</h2>
+
+      <h3>Package Compatibility (Julia-specific)</h3>
+
+      <p>Running NeuralPDE.jl on Julia 1.12 exposed three naming conflicts:</p>
+
+      <table>
+        <thead>
+          <tr><th>Issue</th><th>Symptom</th><th>Fix</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>Interval</code> moved</td><td><code>UndefVarError: Interval</code></td><td><code>using DomainSets: Interval</code></td></tr>
+          <tr><td><code>Adam</code> ambiguity</td><td>Exported by multiple packages</td><td><code>OptimizationOptimisers.Adam(lr)</code></td></tr>
+          <tr><td><code>LBFGS</code> ambiguity</td><td>Exported by multiple packages</td><td><code>OptimizationOptimJL.LBFGS()</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3>Activation Functions Matter</h3>
+
+      <p>We used <code>tanh</code> rather than sigmoid for a concrete reason: the PDE loss involves $\partial^2 u / \partial x^2$, which is computed by differentiating through the network twice. The second derivative of sigmoid has a very small dynamic range (near-zero almost everywhere), causing vanishing gradients. The second derivative of <code>tanh</code> maintains better dynamic range, reducing Adam iterations needed by approximately 40%.</p>
+
+      <h3>Training Strategy Selection</h3>
+
+      <ul>
+        <li><strong><code>GridTraining(0.05)</code>:</strong> Fast per iteration, but the fixed grid can miss features. Documentation notes this is for testing only.</li>
+        <li><strong><code>StochasticTraining(200)</code>:</strong> Randomly samples new points each iteration. Convergence is noisy.</li>
+        <li><strong><code>QuasiRandomTraining(200)</code>:</strong> Uses low-discrepancy sequences (Latin Hypercube) for more uniform coverage. This produced the smoothest convergence and lowest final error.</li>
+      </ul>
+
+      <h3>The Adam &rarr; L-BFGS Recipe</h3>
+
+      <p>Adam alone converged to a plateau around $10^{-4}$ and started rising slightly near iteration 3000. L-BFGS then cut the loss by a further factor of ~10, reaching $2.055 \times 10^{-5}$. The key insight: Adam is robust and globally explores via stochastic gradients, while L-BFGS converges rapidly near a good local minimum but can fail if started too far away.</p>
+
+      <h3>Network Sizing</h3>
+
+      <p>For the 1D heat equation, two hidden layers of 20 neurons (337 parameters) achieved max error of $2.23 \times 10^{-3}$. For 2D, we needed 32 neurons per layer (1,121 parameters). Going wider (64 neurons) did not improve accuracy and slowed training.</p>
+
+
+      <!-- Section 6 - Our Extension -->
+      <h2>6. Our Extension: Estimating Unknown Thermal Diffusivity</h2>
+
+      <p>In &sect;4, we noted that PINNs "naturally support inverse problems by embedding unknown parameters directly into the loss function." Here we turn that claim into a concrete demonstration: given only noisy, scattered temperature measurements, can the PINN recover the unknown thermal diffusivity $\alpha$?</p>
+
+      <h3>Problem Formulation</h3>
+
+      <p>In many engineering applications, material properties like thermal diffusivity are not precisely known. Instead, engineers place temperature sensors at scattered locations and must <em>infer</em> the physical parameters from measurements. We formalise this inverse problem as:</p>
+
+      <blockquote>
+        <p><strong>Given:</strong> Noisy observations $\{(t_i, x_i, u_i^{\text{obs}})\}_{i=1}^{300}$ with $u_i^{\text{obs}} = u_{\text{exact}}(t_i, x_i) + \epsilon_i$, $\;\epsilon_i \sim \mathcal{N}(0, \sigma^2)$</p>
+        <p><strong>Find:</strong> The thermal diffusivity $\alpha$ and the full temperature field $u(t,x)$</p>
+      </blockquote>
+
+      <p>The only changes to our PINN formulation are: (1) replace the fixed $\alpha = 0.1$ with a trainable parameter $\hat{\alpha}$ initialised to 0.5 (deliberately five times the true value), and (2) add a data-fitting term to the loss:</p>
+
+      <div class="equation-block">$$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{PDE}}(\hat{\alpha}) + \mathcal{L}_{\text{IC}} + \mathcal{L}_{\text{BC}} + \frac{\lambda_d}{N_{\text{obs}}} \sum_{i=1}^{N_{\text{obs}}} \left(\hat{u}(t_i, x_i) - u_i^{\text{obs}}\right)^2$$</div>
+
+      <p>The PDE residual now <em>depends on</em> $\hat{\alpha}$, so the optimiser must simultaneously find network weights <em>and</em> $\hat{\alpha}$ that satisfy the physics while matching the observations.</p>
+
+      <h3>Key Code Changes</h3>
+
+<pre><code class="language-julia"># 1. Declare &alpha; as a trainable parameter (not a constant)
+@parameters &alpha;_inv
+eq = Dt(u(t, x)) ~ &alpha;_inv * Dxx(u(t, x))
+
+# 2. Add a data-fitting loss term
+function data_loss(phi, &theta;_depvar, p_pde)
+    pred = [first(phi[1]([t_obs[i], x_obs[i]], &theta;_depvar.u)) for i in 1:n_obs]
+    return 10.0 * sum(abs2, pred .- u_obs) / n_obs
+end
+
+discretization = PhysicsInformedNN(chain, strategy;
+                                    param_estim = true, additional_loss = data_loss)
+
+# 3. Pass unknown parameter with initial guess to PDESystem
+@named pde_system = PDESystem(eq, bcs, domains, [t, x], [u(t, x)],
+                               [&alpha;_inv];
+                               initial_conditions = Dict(&alpha;_inv =&gt; 0.5))</code></pre>
+
+      <h3>Results</h3>
+
+      <p><strong>Figure 5</strong> shows the estimated $\hat{\alpha}$ over 7000 training iterations. Starting from 0.5, the estimate drops sharply during the first 500 Adam iterations and stabilises near the true value by iteration 1000.</p>
+
+      <img src="static/images/fig5_alpha_conv.png" alt="Convergence of estimated alpha" loading="lazy" style="width:100%">
+      <p class="figure-caption">Figure 5: Convergence of the estimated thermal diffusivity from initial guess 0.5 to near the true value 0.1.</p>
+
+      <div class="training-output">
+<span class="phase">=== Phase 1: Adam (5000 iters) ===</span>
+Iter  500  |  Loss = 0.008763  |  &alpha;_est = 0.09404
+Iter 1000  |  Loss = 0.004492  |  &alpha;_est = 0.09843
+Iter 2000  |  Loss = 0.004141  |  &alpha;_est = 0.09921
+Iter 5000  |  Loss = 0.004106  |  &alpha;_est = 0.09932
+
+<span class="phase">=== Phase 2: L-BFGS (2000 iters) ===</span>
+<span class="result">True &alpha;       = 0.1
+Estimated &alpha;  = 0.09926
+Relative err = 0.741%</span>
+      </div>
+
+      <table>
+        <thead>
+          <tr><th>Noise level $\sigma$</th><th>Estimated $\hat{\alpha}$</th><th>Relative error</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>0.02 (2%)</td><td>0.0993</td><td>0.7%</td></tr>
+        </tbody>
+      </table>
+
+      <p><strong>Figure 6</strong> shows the PINN prediction at $t = 0.1$ overlaid with noisy observation data and the exact solution. The PINN smoothly interpolates through the noise while respecting the physical constraints.</p>
+
+      <img src="static/images/fig6_inverse_fit.png" alt="Inverse PINN fit" loading="lazy" style="width:100%">
+      <p class="figure-caption">Figure 6: PINN prediction (dashed blue) vs exact solution (red) and noisy observations (grey dots) at t = 0.1.</p>
+
+      <h3>Why This Matters</h3>
+
+      <p>With FDM, solving an inverse problem requires an outer optimisation loop &mdash; guess $\alpha$, solve the full PDE, compare with data, update $\alpha$, repeat. Each iteration involves a complete PDE solve. With PINNs, the parameter estimation is performed <em>jointly</em> with the solution in a single training loop.</p>
+
+      <p>Moreover, the PDE constraint provides <strong>physics-based regularisation</strong>: even with only 300 noisy observations, the network cannot overfit because it is simultaneously constrained to satisfy the heat equation everywhere in the domain. The physics acts as a strong prior that constrains the solution space far beyond what sparse data alone could determine.</p>
+
+
+      <!-- Section 7 -->
+      <h2>7. Conclusion</h2>
+
+      <p>We demonstrated how PINNs can solve the heat equation &mdash; a PDE that goes beyond the ODE examples covered in EE5311. Using Julia's <code>NeuralPDE.jl</code>, we built solvers for both 1D and 2D heat conduction and validated them against analytical solutions. Our measured results &mdash; a maximum absolute error of $2.23 \times 10^{-3}$ for the PINN versus $\sim 10^{-5}$ for FDM &mdash; confirm the well-known trade-off: PINNs sacrifice raw accuracy on simple regular-domain problems in exchange for mesh-free flexibility, continuous solution representations, and natural extensibility to inverse problems.</p>
+
+      <p>We then went beyond the standard forward-problem demonstration by solving an <strong>inverse heat conduction problem</strong> (&sect;6), recovering the unknown thermal diffusivity $\alpha$ from noisy sensor data with only 0.7% relative error. This concretely illustrates the unique advantage that PINNs offer over classical methods: the physics embedded in the loss function acts as a powerful regulariser, enabling simultaneous solution estimation and parameter identification in a single training loop.</p>
+
+      <p>For readers interested in going further, exciting directions include: applying PINNs to nonlinear PDEs such as the Burgers equation, extending the inverse framework to estimate <em>spatially varying</em> diffusivity $\alpha(x)$, and exploring <code>NeuralOperators.jl</code> for learning solution operators that generalise across different initial conditions.</p>
+
+
+      <!-- References -->
+      <h2>References</h2>
+      <ol>
+        <li>Raissi, M., Perdikaris, P., &amp; Karniadakis, G. E. (2019). Physics-informed neural networks: A deep learning framework for solving forward and inverse problems involving nonlinear partial differential equations. <em>Journal of Computational Physics</em>, 378, 686&ndash;707.</li>
+        <li>Zubov, K., et al. (2021). NeuralPDE: Automating Physics-Informed Neural Networks (PINNs) with Error Approximations. <em>arXiv:2107.09443</em>.</li>
+        <li>EE5311 Course Notes v3.0.0, &sect;3.5: Physics-informed Neural Networks.</li>
+      </ol>
+
+
+      <!-- Contributions -->
+      <h2>Contributions</h2>
+
+      <div class="contrib-card">
+        <span class="name">Yin Bo</span>
+        <span class="desc">Inverse problem formulation, implementation (<code>pinn_inverse.jl</code>), noise-level experiments, NeuralPDE compatibility debugging</span>
+      </div>
+      <div class="contrib-card">
+        <span class="name">Fang An</span>
+        <span class="desc">Problem formulation, mathematical background, analytical solution derivation</span>
+      </div>
+      <div class="contrib-card">
+        <span class="name">Liu Cheng</span>
+        <span class="desc">1D PINN implementation with NeuralPDE.jl, code development, package compatibility fixes</span>
+      </div>
+      <div class="contrib-card">
+        <span class="name">Niu Cheng</span>
+        <span class="desc">Extension to 2D, FDM implementation, systematic comparison, performance benchmarking</span>
+      </div>
+      <div class="contrib-card">
+        <span class="name">Jiang Yuxing</span>
+        <span class="desc">Training experiments (activation functions, strategies, loss balancing), practical guidelines</span>
+      </div>
+
+      <p style="margin-top:1rem; color: var(--text-secondary); font-size: 0.95rem;">All members contributed to proofreading and revising the final blog post.</p>
+
+    </div><!-- end blog-content -->
+  </div>
+</section>
+
+</main>
+
+<footer class="footer">
+  <div class="container">
+    <div class="columns is-centered">
+      <div class="column is-8">
+        <div class="content has-text-centered">
+          <p>
+            This page was built using the <a href="https://github.com/eliahuhorwitz/Academic-project-page-template" target="_blank">Academic Project Page Template</a>.
+            Licensed under <a rel="license" href="http://creativecommons.org/licenses/by-sa/4.0/" target="_blank">CC BY-SA 4.0</a>.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

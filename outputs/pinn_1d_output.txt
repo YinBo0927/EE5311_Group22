@@ -1,0 +1,19 @@
+=== Phase 1: Adam (3000 iters) ===
+Iter  500  |  Loss = 5.180e-4
+Iter 1000  |  Loss = 1.496e-4
+Iter 1500  |  Loss = 1.311e-4
+Iter 2000  |  Loss = 1.374e-4
+Iter 2500  |  Loss = 1.492e-4
+Iter 3000  |  Loss = 3.848e-4
+
+=== Phase 2: L-BFGS (1000 iters) ===
+✓ Training complete. Final loss = 2.055e-5
+
+Max  absolute error: 2.23e-3
+Mean absolute error: 4.91e-4
+Saved fig1_surface.png
+Saved fig2_error.png
+Saved fig3_loss.png
+Saved fig4_slices.png
+
+✓ All figures saved to current directory.

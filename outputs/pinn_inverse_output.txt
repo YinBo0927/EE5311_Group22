@@ -1,0 +1,28 @@
+Generated 300 observations with noise σ = 0.02
+True α = 0.1,  initial guess α₀ = 0.5
+
+=== Phase 1: Adam (5000 iters) ===
+Iter  500  |  Loss = 0.008763  |  α_est = 0.09404
+Iter 1000  |  Loss = 0.004492  |  α_est = 0.09843
+Iter 1500  |  Loss = 0.004191  |  α_est = 0.09906
+Iter 2000  |  Loss = 0.004141  |  α_est = 0.09921
+Iter 2500  |  Loss = 0.004164  |  α_est = 0.09909
+Iter 3000  |  Loss = 0.004235  |  α_est = 0.09923
+Iter 3500  |  Loss = 0.004207  |  α_est = 0.09928
+Iter 4000  |  Loss = 0.004109  |  α_est = 0.09927
+Iter 4500  |  Loss = 0.004121  |  α_est = 0.09943
+Iter 5000  |  Loss = 0.004106  |  α_est = 0.09932
+
+=== Phase 2: L-BFGS (2000 iters) ===
+
+==================================================
+  INVERSE PROBLEM RESULT
+==================================================
+  True α       = 0.1
+  Estimated α  = 0.099259
+  Relative err = 0.741%
+==================================================
+Saved fig5_alpha_conv.png
+Saved fig6_inverse_fit.png
+
+✓ All inverse problem figures saved.
